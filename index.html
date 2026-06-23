@@ -273,6 +273,7 @@ let currentSiteName = "";
 let currentBuilding = "";
 let currentArea = "";
 let currentReportType = ""; 
+let currentSaveSsId = "";
 
 // ページ読み込み時の処理
 window.onload = () => {
@@ -315,7 +316,10 @@ function attemptLogin() {
   if (!id || !pass) return alert("事業所とパスワードを入力してください");
   getScriptRun(result => {
     if (result.success) {
-      currentSiteName = result.siteName; hideAllViews();
+      currentSiteName = result.siteName; 
+      currentSaveSsId = result.targetSsId;
+
+      hideAllViews();
       document.getElementById('menuView').style.display = 'block';
       document.getElementById('welcomeMsg').innerText = "事業所: " + currentSiteName;
       setupCommonFields();
@@ -393,7 +397,7 @@ function updateAreaButtonsBadge() {
         }
       }
     });
-  }).getBuildingData(date, currentSiteName, currentBuilding);
+  }).getBuildingData(date, currentSiteName, currentBuilding,currentSaveSsId);
 }
 
 function showInputForm(areaName) {
@@ -493,7 +497,7 @@ function fetchSavedData() {
       });
     }
     updateUnfilledCount();
-  }).getDailyData(date, currentSiteName, currentBuilding, currentArea);
+  }).getDailyData(date, currentSiteName, currentBuilding, currentArea,currentSaveSsId);
 }
 
 function updateUnfilledCount() {
@@ -550,7 +554,7 @@ function executeSubmit() {
     const resModalEl = document.getElementById('resultModal');
     const resModal = bootstrap.Modal.getInstance(resModalEl) || new bootstrap.Modal(resModalEl);    
     resModal.show();
-  }).saveData(results);
+  }).saveData(results,currentSaveSsId);
 }
 
 function syncGroupValues(sender) {
@@ -603,7 +607,7 @@ function reloadReportTable() {
   document.getElementById('reportTableSpinner').style.display = 'block';
   document.getElementById('reportTableContent').innerHTML = '';
   
-  getScriptRun(renderTableData).getReportTableData(date, currentSiteName, currentReportType);
+  getScriptRun(renderTableData).getReportTableData(date, currentSiteName, currentReportType,currentSaveSsId);
 }
 
 function showListTable() {
@@ -623,7 +627,7 @@ function loadListTable() {
   document.getElementById('listTableSpinner').style.display = 'block';
   document.getElementById('listTableContent').innerHTML = '';
   
-  getScriptRun(renderTableData).getListTableData(date, currentSiteName, sheetName);
+  getScriptRun(renderTableData).getListTableData(date, currentSiteName, sheetName,currentSaveSsId);
 }
 
 // 大伸運輸の一時データを保持する変数
@@ -987,7 +991,7 @@ function recalcDaishinRow(rowIndex) {
     .withFailureHandler(function(err) {
       console.error("GAS通信エラー:", err);
     })
-    .updateDaishinData(savePayload);
+    .updateDaishinData(savePayload,currentSaveSsId);
 }
 
    function openUrlInNewTab(url) {

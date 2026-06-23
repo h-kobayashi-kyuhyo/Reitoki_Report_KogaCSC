@@ -34,7 +34,7 @@ function checkLogin(id, password) {
   
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][0]) === id && String(data[i][2]) === password) {
-      return { success: true, siteName: data[i][1] };
+      return { success: true, siteName: data[i][1],targetSsId:data[i][4]};
     }
   }
   return { success: false };
@@ -55,18 +55,20 @@ function getSiteList() {
 }
 
 // ==========================================
-// 追加: 既存データを取得する処理（エリア別・フォーム反映用）
+// 🌟 各工場の「保存用スプシ」を狙い撃ちで開く処理
+// （引数の最後に targetSsId を追加して動的に切り替えます）
 // ==========================================
-function getDailyData(dateStr, siteName, building, area) {
+
+// 既存データを取得する処理（エリア別・フォーム反映用）
+function getDailyData(dateStr, siteName, building, area, targetSsId) {
   try {
-    const ss = SpreadsheetApp.openById(SS_ID);
+    const ss = SpreadsheetApp.openById(targetSsId); // 🌟各工場のスプシを開く
     const sheet = ss.getSheetByName('データ保存');
     if (!sheet) return [];
     
     const data = sheet.getDataRange().getValues();
     const result = [];
-    
-    for (let i = 1; i < data.length; i++) { // 1行目はヘッダー想定
+    for (let i = 1; i < data.length; i++) {
       const row = data[i];
       if(!row[0]) continue;
       
@@ -77,9 +79,8 @@ function getDailyData(dateStr, siteName, building, area) {
          dStr = String(row[0]).replace(/\//g, '-');
       }
       
-      // 日付、事業所、棟、エリアがすべて一致する行を抽出
       if (dStr === dateStr && row[1] === siteName && row[4] === building && row[5] === area) {
-        const eqName = String(row[6]).replace(/^'/, ''); // 先頭のシングルクォートを除外
+        const eqName = String(row[6]).replace(/^'/, '');
         result.push({
           no: eqName,
           item: String(row[7]),
@@ -98,16 +99,15 @@ function getDailyData(dateStr, siteName, building, area) {
 // ==========================================
 // 追加: 既存データを取得する処理（棟全体・未入力バッジ計算用）
 // ==========================================
-function getBuildingData(dateStr, siteName, building) {
+function getBuildingData(dateStr, siteName, building, targetSsId) {
   try {
-    const ss = SpreadsheetApp.openById(SS_ID);
+    const ss = SpreadsheetApp.openById(targetSsId); // 🌟各工場のスプシを開く
     const sheet = ss.getSheetByName('データ保存');
     if (!sheet) return [];
     
     const data = sheet.getDataRange().getValues();
     const result = [];
-    
-    for (let i = 1; i < data.length; i++) { // 1行目はヘッダー想定
+    for (let i = 1; i < data.length; i++) {
       const row = data[i];
       if(!row[0]) continue;
       
@@ -118,7 +118,6 @@ function getBuildingData(dateStr, siteName, building) {
          dStr = String(row[0]).replace(/\//g, '-');
       }
       
-      // エリアは問わず、棟までの条件が一致する行を抽出
       if (dStr === dateStr && row[1] === siteName && row[4] === building) {
         const eqName = String(row[6]).replace(/^'/, '');
         result.push({
@@ -137,22 +136,18 @@ function getBuildingData(dateStr, siteName, building) {
   }
 }
 
-// ==========================================
-// 変更: データ保存（上書き処理対応）
-// ==========================================
-function saveData(results) {
+// データ保存（上書き処理対応）
+function saveData(results, targetSsId) {
   try {
-    const ss = SpreadsheetApp.openById(SS_ID);
+    const ss = SpreadsheetApp.openById(targetSsId); // 🌟各工場のスプシを開く
     const sheet = ss.getSheetByName('データ保存');
     const now = new Date();
     
-    // 既存データをすべて取得
     const dataRange = sheet.getDataRange();
     const data = dataRange.getValues();
     
-    // 既存データの検索用マップを作成（行番号を記録）
     const rowMap = new Map();
-    for (let i = 1; i < data.length; i++) { // 1行目はヘッダー想定
+    for (let i = 1; i < data.length; i++) {
       const row = data[i];
       if(!row[0]) continue;
       
@@ -163,21 +158,16 @@ function saveData(results) {
          dateStr = String(row[0]).replace(/\//g, '-');
       }
       
-      const eqName = String(row[6]).replace(/^'/, ''); // シングルクォートを除外
-      
-      // ユニークな検索キーを作成（日付|事業所|棟|エリア|設備名|項目名）
+      const eqName = String(row[6]).replace(/^'/, '');
       const key = `${dateStr}|${row[1]}|${row[4]}|${row[5]}|${eqName}|${row[7]}`;
-      rowMap.set(key, i + 1); // getRangeで使うため1-indexedの行番号にする
+      rowMap.set(key, i + 1);
     }
 
     const newRows = [];
-    
     results.forEach(res => {
-      // 今回画面から送信されたデータのキー
       const key = `${res.date}|${res.site}|${res.building}|${res.area}|${res.no}|${res.item}`;
       
       if (rowMap.has(key)) {
-        // 【上書き処理】すでに同じキーのデータが存在する場合は、その行をまるごと更新
         const rowNum = rowMap.get(key);
         sheet.getRange(rowNum, 1, 1, 11).setValues([[
           res.date,      // A: 点検日
@@ -193,7 +183,6 @@ function saveData(results) {
           `=A${rowNum}&G${rowNum}&H${rowNum}` //検索値
         ]]);
       } else {
-        // 【新規追加処理】データが存在しない場合は、新規追加リストに入れる
         newRows.push([
           res.date,
           res.site,
@@ -210,15 +199,12 @@ function saveData(results) {
       }
     });
 
-    // 新規追加行があれば、まとめてスプレッドシートの末尾に追加
     if (newRows.length > 0) {
       const startRow = sheet.getLastRow() + 1;
-      // 変更: 新規追加する行それぞれの行番号を計算し、K列に数式をセット
       for (let i = 0; i < newRows.length; i++) {
         const rowNum = startRow + i;
-        newRows[i][10] = `=A${rowNum}&G${rowNum}&H${rowNum}`; // インデックス10 = K列
+        newRows[i][10] = `=A${rowNum}&G${rowNum}&H${rowNum}`;
       }
-      // 変更: 10列から11列(K列)に変更
       sheet.getRange(startRow, 1, newRows.length, 11).setValues(newRows);
     }
     
@@ -228,80 +214,58 @@ function saveData(results) {
   }
 }
 
-function getReportTableData(dateStr, siteName, reportType) {
+// 各種日報・一覧表データの取得
+function getReportTableData(dateStr, siteName, reportType, targetSsId) {
   const sheetName = (reportType === '運転日報') ? '運転日報' : '大伸運輸';
-  return getSpreadsheetTableData(sheetName, dateStr, 'reportTableContent', 'reportTableSpinner');
+  return getSpreadsheetTableData(sheetName, dateStr, 'reportTableContent', 'reportTableSpinner', targetSsId);
 }
 
-function getListTableData(dateStr, siteName, sheetName) {
-  return getSpreadsheetTableData(sheetName, dateStr, 'listTableContent', 'listTableSpinner');
+function getListTableData(dateStr, siteName, sheetName, targetSsId) {
+  return getSpreadsheetTableData(sheetName, dateStr, 'listTableContent', 'listTableSpinner', targetSsId);
 }
 
-/**
- * スプレッドシートの指定シートからデータを取得する
- */
-function getSpreadsheetTableData(sheetName, targetDateStr, containerId, spinnerId) {
+// 各工場のシートからデータを引っ張って計算・表示用データを返す
+function getSpreadsheetTableData(sheetName, targetDateStr, containerId, spinnerId, targetSsId) {
   try {
-    const ss = SpreadsheetApp.openById(SS_ID);
+    const ss = SpreadsheetApp.openById(targetSsId); // 🌟各工場のスプシを開く
     const sheet = ss.getSheetByName(sheetName);
     
     if (!sheet) {
       return { success: false, error: "シート「" + sheetName + "」が見つかりません", containerId: containerId, spinnerId: spinnerId };
     }
     
-if (targetDateStr) {
+    if (targetDateStr) {
       const formattedDate = targetDateStr.replace(/-/g,'/');
-      
       if (sheetName === '運転日報') {
-        // 運転日報の場合は B2 セルに日付を入力
         sheet.getRange("B2").setValue(formattedDate);
-        
       } else if (sheetName === '大伸運輸') {
-        // 大伸運輸の場合は A1 セルに日付を入力
-        // （※実際のシートに合わせてセル番地を変更してください）
         sheet.getRange("A1").setValue(formattedDate);
-        
       } else if (sheetName.includes('一覧表')) {
-        // 「一覧表_運転時間」や「一覧表_電気/水道」の場合は A1 セルに日付を入力
-        // （※実際のシートに合わせてセル番地を変更してください）
         sheet.getRange("A1").setValue(formattedDate);
       }
-      
-      // 値を入れた後、スプレッドシートの計算式が完了するのを待つ
-      SpreadsheetApp.flush(); 
+      SpreadsheetApp.flush();
     }
     
-    // 表示されている値（計算結果）をそのまま取得
     const displayValues = sheet.getDataRange().getDisplayValues();
-    
     return { success: true, data: displayValues, containerId: containerId, spinnerId: spinnerId };
-    
   } catch(e) {
     return { success: false, error: e.toString(), containerId: containerId, spinnerId: spinnerId };
   }
 }
+
 // 大伸運輸のチェックボックス・単価・計算結果をスプレッドシートに保存する関数
-function updateDaishinData(updatedRows) {
+function updateDaishinData(updatedRows, targetSsId) {
   try {
-    const ss = SpreadsheetApp.openById(SS_ID);
+    const ss = SpreadsheetApp.openById(targetSsId); // 🌟各工場のスプシを開く
     const sheet = ss.getSheetByName('大伸運輸');
     if (!sheet) return { success: false, error: "「大伸運輸」シートが見つかりません" };
 
-    // updatedRows は画面から送られてくる配列 [ {rowIndex: 2, checked: true, price: 150, result: 4500}, ... ]
     updatedRows.forEach(item => {
-      // スプレッドシートの行番号は rowIndex + 1
       const rowNum = item.rowIndex + 1;
-      
-      // J列 (10列目): チェックボックス (TRUE / FALSE)
       sheet.getRange(rowNum, 10).setValue(item.checked);
-      
-      // L列 (12列目): 単価
       sheet.getRange(rowNum, 12).setValue(item.price);
-      
-      // N列 (14列目): 計算結果
       sheet.getRange(rowNum, 14).setValue(item.result);
     });
-
     SpreadsheetApp.flush();
     return { success: true };
   } catch (e) {
