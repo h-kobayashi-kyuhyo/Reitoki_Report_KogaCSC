@@ -73,92 +73,55 @@
     }
 
 
-  media print {
-  /* 1. 印刷時はボタンや日付選択、メニューなどを完全に非表示 */
-  nav, .navbar, .btn, button, select, input[type="date"], #listTableSelect, .spinner-border, .alert {
-    display: none !important;
-  }
-  body {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    background-color: #fff !important;
-    color: #000 !important;
-    padding: 0 !important;
-    margin: 0 !important;
-  }
-
-  /* 2. テーブル共通：スクロール制限の解除 */
-  .table-responsive {
-    overflow: visible !important;
-    max-height: none !important; 
-    width: 100% !important;
-  }
-  table {
-    width: 100% !important;
-    table-layout: auto !important;
-    border-collapse: collapse !important;
-  }
-  input[type="checkbox"], input[type="number"], input[type="text"] {
-    border: none !important;
-    background: transparent !important;
-    appearance: none;
-    -webkit-appearance: none;
-  }
-
-  /* =========================================================================
-     🌟 画面別の印刷範囲・用紙方向・ページ収め制御
-     ========================================================================= */
-
-  /* 📄 【運転日報】 A4横向き、はみ出さないように自動縮小して印刷範囲を調整 */
-  #reportTableView {
-    page-break-inside: avoid !important; /* 途中でページがちぎれるのを防ぐ */
-   }
-  @style 
-    /* 運転日報画面が開いている時だけ有効になる印刷設定 */
-    :has(#reportTableView:not([style*="display: none"])) {
-      @page {
-        size: A4 landscape; /* A4横向き */
-        margin: 8mm;       /* 余白を少し狭めて2ページ化を防ぐ */
-      }
-      table {
-        transform: scale(0.95); /* 🌟全体を少しだけ縮小して指定範囲内に収める */
-        transform-origin: top left;
-      }
+@media print {
+    /* 印刷時は不要なUIを隠す */
+    nav, .navbar, .btn, button, select, input[type="date"], #listTableSelect, .spinner-border, .alert {
+      display: none !important;
     }
-  }
-  
-
-  /* 📄 【大伸運輸】 A4縦型・1ページにぴったり収める設定 */
-  @style 
-    :has(#daishinTableView:not([style*="display: none"])) {
-      @page {
-        size: A4 portrait; /* 🌟大伸運輸のみ「縦向き」に指定 */
-        margin: 10mm;
-      }
-      /* 表全体をA4縦1ページに強制フィットさせる縮小命令 */
-      #daishinTableContent {
-        transform: scale(0.85); 
-        transform-origin: top left;
-        page-break-inside: avoid !important;
-      }
-    }
-  
-
-  /* 📄 【一覧表】 A4横型・1ページにぴったり収める設定 */
-  @style 
-    :has(#listTableView:not([style*="display: none"])) {
-      @page {
-        size: A4 landscape; /* 🌟一覧表は「横向き」に指定 */
-        margin: 10mm;
-      }
-      /* 横幅が伸びやすい一覧表を横1ページに押し込む縮小命令 */
-      #listTableContent {
-        transform: scale(0.8); /* 🌟文字が潰れない限界までキュッと縮小 */
-        transform-origin: top left;
-        page-break-inside: avoid !important;
-      }
+    body {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      background-color: #fff !important;
+      color: #000 !important;
+      padding: 0 !important;
+      margin: 0 !important;
     }
 
+    /* テーブルのスクロール制限を解除 */
+    .table-responsive {
+      overflow: visible !important;
+      max-height: none !important; 
+      width: 100% !important;
+    }
+
+    /* 改ページを強制するクラス */
+    .page-break-before {
+      page-break-before: always !important;
+      break-before: page !important;
+    }
+
+    /* 大伸運輸の印刷時：元のテーブルを隠し、動的生成した印刷用エリアを表示 */
+    body.printing-daishin #reportTableContent {
+      display: none !important;
+    }
+    #daishinPrintArea {
+      display: block !important;
+    }
+
+    /* ▼ 各画面の縮小率調整 ▼ */
+    #reportTableContent {
+      transform: scale(0.92); /* 運転日報をページに収める調整 */
+      transform-origin: top left;
+    }
+    #daishinPrintArea {
+      transform: scale(0.95); /* 大伸運輸をページに収める調整 */
+      transform-origin: top left;
+    }
+    #listTableContent {
+      transform: scale(0.70); /* 一覧表(A〜AE列)を1枚に押し込む */
+      transform-origin: top left;
+    }
+  }
 
   </style>
 </head>
@@ -417,7 +380,7 @@ function attemptLogin() {
   }).checkLogin(id, pass);
 }
 
-function showBuildingSelection() {
+function showBuildingSelection() {ボタンの中に「棟の名前」と「未完了エリア数の表示枠」を組み込みます
   hideAllViews();
   // 🌟 実際のHTMLに合わせて「buildingSelectView」に修正します！
   document.getElementById('buildingSelectView').style.display = 'block';
@@ -861,9 +824,12 @@ function renderTableData(response) {
           html += `<th style="border: none !important; background-color: transparent !important; padding: 4px 6px;"></th>`;
         }
       });
-      html += "</tr>";
-      return; 
+    if (isDriverLog && rowIndex === 27) {
+      html += "<tr class='page-break-before'>";
+    } else {
+      html += "<tr>";
     }
+  }
 
     // =========================================================================
     // 【運転日報のみ】ヘッダー作成ロジック
@@ -1166,9 +1132,114 @@ function recalcDaishinRow(rowIndex) {
     window.open(url, '_blank');
   }
 
- function printReportTable() {
-  window.print();
-  }         
+// =========================================================================
+// 🌟 印刷（PDF出力）用コントロール関数
+// =========================================================================
+
+// 用紙の向きを動的に設定する関数
+function setPrintPageStyle(orientation) {
+  let styleEl = document.getElementById('dynamicPrintStyle');
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = 'dynamicPrintStyle';
+    document.head.appendChild(styleEl);
+  }
+  if (orientation === 'landscape') {
+    styleEl.innerHTML = '@page { size: A4 landscape; margin: 10mm; }';
+  } else {
+    styleEl.innerHTML = '@page { size: A4 portrait; margin: 12mm; }';
+  }
+}
+
+// 印刷実行
+function printReportTable() {
+  if (currentReportType === '大伸運輸' && document.getElementById('reportTableView').style.display !== 'none') {
+    // 📄 大伸運輸 (A4縦・2ページ分割)
+    setPrintPageStyle('portrait');
+    document.body.classList.add('printing-daishin');
+    setupDaishinPrintArea(); // 表を分割する処理
+    
+    window.print();
+    
+    // 印刷ダイアログが閉じたら元に戻す
+    document.body.classList.remove('printing-daishin');
+    cleanupDaishinPrintArea();
+
+  } else if (currentReportType === '運転日報' && document.getElementById('reportTableView').style.display !== 'none') {
+    // 📄 運転日報 (A4横)
+    setPrintPageStyle('landscape');
+    window.print();
+
+  } else {
+    // 📄 一覧表 (A4横)
+    setPrintPageStyle('landscape');
+    window.print();
+  }
+}
+
+// 🌟 大伸運輸の表を「A〜H列(1ページ目)」と「J〜N列(2ページ目)」に分割生成する
+function setupDaishinPrintArea() {
+  const originalTable = document.getElementById('reportTableContent');
+  
+  const printArea = document.createElement('div');
+  printArea.id = 'daishinPrintArea';
+  printArea.style.display = 'none'; // 通常時は隠しておく
+  
+  const table1 = document.createElement('table');
+  table1.className = 'custom-table';
+  
+  const table2 = document.createElement('table');
+  table1.className = 'custom-table';
+  table2.className = 'custom-table page-break-before'; // 2ページ目用に改ページ付与
+
+  const rows = originalTable.querySelectorAll('tr');
+  
+  rows.forEach((tr, rowIndex) => {
+    // 1ページ目: A〜H列 (インデックス0〜7)、1〜35行目 (rowIndex 0〜34)
+    if (rowIndex <= 34) {
+      const tr1 = document.createElement('tr');
+      tr1.className = tr.className;
+      const cells = tr.querySelectorAll('td, th');
+      cells.forEach((cell, colIndex) => {
+        if (colIndex <= 7) tr1.appendChild(cell.cloneNode(true));
+      });
+      table1.appendChild(tr1);
+    }
+    
+    // 2ページ目: J〜N列 (インデックス9〜13)、1〜10行目 (rowIndex 0〜9)
+    if (rowIndex <= 9) {
+      const tr2 = document.createElement('tr');
+      tr2.className = tr.className;
+      const cells = tr.querySelectorAll('td, th');
+      cells.forEach((cell, colIndex) => {
+        if (colIndex >= 9 && colIndex <= 13) {
+          const cloneCell = cell.cloneNode(true);
+          // 印刷時は入力欄(input)の枠を消して値だけを見せる工夫
+          const inputs = cloneCell.querySelectorAll('input');
+          inputs.forEach(inp => {
+            if (inp.type === 'number') {
+              inp.parentElement.innerHTML = inp.value ? Number(inp.value).toLocaleString() : "0";
+            }
+          });
+          tr2.appendChild(cloneCell);
+        }
+      });
+      table2.appendChild(tr2);
+    }
+  });
+
+  printArea.appendChild(table1);
+  printArea.appendChild(table2);
+  originalTable.parentNode.appendChild(printArea);
+}
+
+// 分割生成したエリアをお掃除
+function cleanupDaishinPrintArea() {
+  const printArea = document.getElementById('daishinPrintArea');
+  if (printArea) {
+    printArea.remove();
+  }
+}      
 </script>
 </body>
 </html>
