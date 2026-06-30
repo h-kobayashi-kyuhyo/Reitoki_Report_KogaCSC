@@ -72,6 +72,94 @@
       background-color: #fff !important;
     }
 
+
+  media print {
+  /* 1. 印刷時はボタンや日付選択、メニューなどを完全に非表示 */
+  nav, .navbar, .btn, button, select, input[type="date"], #listTableSelect, .spinner-border, .alert {
+    display: none !important;
+  }
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background-color: #fff !important;
+    color: #000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* 2. テーブル共通：スクロール制限の解除 */
+  .table-responsive {
+    overflow: visible !important;
+    max-height: none !important; 
+    width: 100% !important;
+  }
+  table {
+    width: 100% !important;
+    table-layout: auto !important;
+    border-collapse: collapse !important;
+  }
+  input[type="checkbox"], input[type="number"], input[type="text"] {
+    border: none !important;
+    background: transparent !important;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+
+  /* =========================================================================
+     🌟 画面別の印刷範囲・用紙方向・ページ収め制御
+     ========================================================================= */
+
+  /* 📄 【運転日報】 A4横向き、はみ出さないように自動縮小して印刷範囲を調整 */
+  #reportTableView {
+    page-break-inside: avoid !important; /* 途中でページがちぎれるのを防ぐ */
+   }
+  @style 
+    /* 運転日報画面が開いている時だけ有効になる印刷設定 */
+    :has(#reportTableView:not([style*="display: none"])) {
+      @page {
+        size: A4 landscape; /* A4横向き */
+        margin: 8mm;       /* 余白を少し狭めて2ページ化を防ぐ */
+      }
+      table {
+        transform: scale(0.95); /* 🌟全体を少しだけ縮小して指定範囲内に収める */
+        transform-origin: top left;
+      }
+    }
+  }
+  
+
+  /* 📄 【大伸運輸】 A4縦型・1ページにぴったり収める設定 */
+  @style 
+    :has(#daishinTableView:not([style*="display: none"])) {
+      @page {
+        size: A4 portrait; /* 🌟大伸運輸のみ「縦向き」に指定 */
+        margin: 10mm;
+      }
+      /* 表全体をA4縦1ページに強制フィットさせる縮小命令 */
+      #daishinTableContent {
+        transform: scale(0.85); 
+        transform-origin: top left;
+        page-break-inside: avoid !important;
+      }
+    }
+  
+
+  /* 📄 【一覧表】 A4横型・1ページにぴったり収める設定 */
+  @style 
+    :has(#listTableView:not([style*="display: none"])) {
+      @page {
+        size: A4 landscape; /* 🌟一覧表は「横向き」に指定 */
+        margin: 10mm;
+      }
+      /* 横幅が伸びやすい一覧表を横1ページに押し込む縮小命令 */
+      #listTableContent {
+        transform: scale(0.8); /* 🌟文字が潰れない限界までキュッと縮小 */
+        transform-origin: top left;
+        page-break-inside: avoid !important;
+      }
+    }
+
+
   </style>
 </head>
 <body>
@@ -163,6 +251,7 @@
       <div class="mb-3 d-flex align-items-center bg-light p-2 rounded border">
         <label class="me-2 fw-bold small text-muted">表示日:</label>
         <input type="date" id="reportTableDate" class="form-control form-control-sm w-auto" onchange="reloadReportTable()">
+        <button class="btn btn-success btn-sm ms-2" onclick="printReportTable()">PDFで印刷</button>
       </div>
 
       <div id="reportTableSpinner" class="text-center my-4" style="display: none;">
@@ -189,6 +278,7 @@
       <div class="mb-3 d-flex flex-wrap align-items-center bg-light p-2 rounded border">
         <label class="me-2 fw-bold small text-muted">表示日 (対象月):</label>
         <input type="date" id="listTableDate" class="form-control form-control-sm w-auto" onchange="loadListTable()">
+        <button class="btn btn-success btn-sm ms-2" onclick="printReportTable()">PDFで印刷</button>
       </div>
 
       <div id="listTableSpinner" class="text-center my-4" style="display: none;">
@@ -329,14 +419,92 @@ function attemptLogin() {
 
 function showBuildingSelection() {
   hideAllViews();
-  const myConfig = masterData.filter(row => row[0] === currentSiteName);
-  const buildings = [...new Set(myConfig.map(row => row[1]))];
-  const view = document.getElementById('buildingSelectView');
+  // 🌟 実際のHTMLに合わせて「buildingSelectView」に修正します！
+  document.getElementById('buildingSelectView').style.display = 'block';
+  // 🌟 実際のHTMLに合わせて「buildingButtonContainer」に修正します！
   const container = document.getElementById('buildingButtonContainer');
-  if(view && container){
-   view.style.display = 'block'; container.innerHTML = '';
-   buildings.forEach(b => { if(b){ container.appendChild(createMenuBtn(b, () => showAreaSelection(b))); } });
- }
+  container.innerHTML = '';
+
+  // 🌟 実際のHTMLに合わせて、日付インプットのIDを「commonDate」にします
+  const date = document.getElementById('commonDate').value;
+  const buildings = [...new Set(masterData.filter(r => r[0] === currentSiteName).map(r => r[1]))];
+
+  buildings.forEach(bld => {
+    if (!bld) return;
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-outline-primary btn-lg p-4 text-start d-flex justify-content-between align-items-center';
+    
+    // 🌟 ボタンの中に「棟の名前」と「未完了エリア数の表示枠」を組み込みます
+    btn.innerHTML = `
+      <span class="fs-4 fw-bold">${bld}</span>
+      <span class="badge bg-secondary fs-6" id="badge-bld-${bld}">確認中...</span>
+    `;
+    // 🌟 元のコードの遷移先である「showAreaSelection(bld)」を正しく呼び出します
+    btn.onclick = () => showAreaSelection(bld);
+    container.appendChild(btn);
+
+    // 🌟 画面が出た瞬間に、裏側でその棟の「未完了エリア数」を数えにいきます
+    updateBuildingButtonBadge(date, bld);
+  });
+}
+
+// 🌟【修正】棟選択ボタンの上に「未完了が残っているエリアの数」を計算して表示する関数
+function updateBuildingButtonBadge(date, bld) {
+  const badgeEl = document.getElementById(`badge-bld-${bld}`);
+  if (!badgeEl) return;
+
+  getScriptRun(data => {
+    // 1. マスタから、この棟に所属する「エリア名」のリストを重複なく取得
+    const allAreas = [...new Set(masterData.filter(r => r[0] === currentSiteName && r[1] === bld).map(r => r[2]))];
+    
+    // 🌟 未完了が1台以上残っている「エリアの数」を数える変数
+    let unfinishedAreaCount = 0;
+
+    // 2. エリアごとに、未入力の設備が1台でもあるかを判定する
+    allAreas.forEach(area => {
+      const areaMaster = masterData.filter(row => row[0] === currentSiteName && row[1] === bld && row[2] === area);
+      const eqRequiredMap = {};
+      
+      areaMaster.forEach(row => {
+        const eqName = row[3]; const type = row[4]; let itemsCount = 0;
+        if (type === 'Refrigerator' || type === 'Ref_V') {
+          const items = row[5] ? row[5].split(/[、,]/) : ["低圧","高圧","油面","電流"]; itemsCount = items.length;
+        } else { itemsCount = 1; }
+        if (!eqRequiredMap[eqName]) eqRequiredMap[eqName] = 0;
+        eqRequiredMap[eqName] += itemsCount;
+      });
+
+      const areaSavedData = data.filter(d => d.area === area);
+      const eqSavedMap = {}; const uniqueSavedItems = new Set();
+      areaSavedData.forEach(d => {
+        const key = `${d.no}-${d.item}`;
+        if (!uniqueSavedItems.has(key)) { uniqueSavedItems.add(key); if (!eqSavedMap[d.no]) eqSavedMap[d.no] = 0; eqSavedMap[d.no]++; }
+      });
+
+      // このエリアの中に、1台でも未完了の設備があるかをチェックする
+      let hasUnfinishedEq = false;
+      for (const eqName in eqRequiredMap) {
+        if ((eqSavedMap[eqName] || 0) < eqRequiredMap[eqName]) {
+          hasUnfinishedEq = true; // 未完了の設備を発見
+          break; // このエリアは未完了確定なのでループを抜ける
+        }
+      }
+
+      // 🌟 1台でも未完了の設備があれば、「未完了エリア」として1つカウントする
+      if (hasUnfinishedEq) {
+        unfinishedAreaCount++;
+      }
+    });
+
+    // 3. 計算結果をもとに、棟ボタンのバッジ表示を更新
+    if (unfinishedAreaCount > 0) {
+      badgeEl.className = 'badge bg-danger fs-6';
+      badgeEl.innerText = `未完了: ${unfinishedAreaCount}エリア`; // 🌟「〇エリア」表記
+    } else {
+      badgeEl.className = 'badge bg-success fs-6';
+      badgeEl.innerText = '完了';
+    }
+  }).getBuildingData(date, currentSiteName, bld, currentSaveSsId);
 }
 
 function showAreaSelection(buildingName) {
@@ -994,9 +1162,13 @@ function recalcDaishinRow(rowIndex) {
     .updateDaishinData(savePayload,currentSaveSsId);
 }
 
-   function openUrlInNewTab(url) {
+ function openUrlInNewTab(url) {
     window.open(url, '_blank');
-   }      
+  }
+
+ function printReportTable() {
+  window.print();
+  }         
 </script>
 </body>
 </html>
