@@ -110,16 +110,13 @@
 
     /* ▼ 各画面の縮小率調整 ▼ */
     #reportTableContent {
-      transform: scale(0.92); /* 運転日報をページに収める調整 */
-      transform-origin: top left;
+      zoom: 0.70; /* 運転日報をページに収める調整 */
     }
     #daishinPrintArea {
-      transform: scale(0.95); /* 大伸運輸をページに収める調整 */
-      transform-origin: top left;
+      zoom: 0.75; /* 大伸運輸をページに収める調整 */
     }
     #listTableContent {
-      transform: scale(0.70); /* 一覧表(A〜AE列)を1枚に押し込む */
-      transform-origin: top left;
+      zoom: 0.50; /* 一覧表(A〜AE列)を1枚に押し込む */
     }
   }
 
@@ -380,7 +377,7 @@ function attemptLogin() {
   }).checkLogin(id, pass);
 }
 
-function showBuildingSelection() {ボタンの中に「棟の名前」と「未完了エリア数の表示枠」を組み込みます
+function showBuildingSelection() {
   hideAllViews();
   // 🌟 実際のHTMLに合わせて「buildingSelectView」に修正します！
   document.getElementById('buildingSelectView').style.display = 'block';
@@ -792,7 +789,6 @@ function renderTableData(response) {
     daishinTableData = JSON.parse(JSON.stringify(matrix)); 
   }
 
-  // 【④用事前準備】運転日報の場合、G2セル（matrix[1][6]）から「◯日分」の数字だけを抽出して24倍しておく
   let g2HoursLimit = 0;
   if (isDriverLog && matrix[1] && matrix[1][6]) {
     const g2Text = matrix[1][6].toString();
@@ -802,6 +798,9 @@ function renderTableData(response) {
 
   matrix.forEach((row, rowIndex) => {
 
+    // 🌟追加：運転日報の場合、54行目（インデックス53）以降は処理せず切り捨てる！
+    if (isDriverLog && rowIndex > 53) return;
+
     // =========================================================================
     // 【運転日報のみ】タイトル行（1行目、29行目）の結合処理
     // =========================================================================
@@ -809,11 +808,14 @@ function renderTableData(response) {
       html += "<tr>";
       let skip = 0;
       row.forEach((cell, colIndex) => {
+        // 🌟追加：L列（インデックス11）より右は表示しない
+        if (colIndex > 11) return;
+
         if (skip > 0) { skip--; return; }
         const cellText = cell ? cell.toString().trim() : "";
         if (cellText !== "") {
           let maxColspan = 5; let colspan = 1;
-          for (let j = colIndex + 1; j < row.length; j++) {
+          for (let j = colIndex + 1; j <= 11; j++) { // 🌟最大L列(11)までで結合チェックを止める
             if (colspan >= maxColspan) break;
             const nextCell = row[j] ? row[j].toString().replace(/[\s ]+/g, "") : "";
             if (nextCell === "") { colspan++; } else { break; }
@@ -824,12 +826,9 @@ function renderTableData(response) {
           html += `<th style="border: none !important; background-color: transparent !important; padding: 4px 6px;"></th>`;
         }
       });
-    if (isDriverLog && rowIndex === 27) {
-      html += "<tr class='page-break-before'>";
-    } else {
-      html += "<tr>";
+      html += "</tr>";
+      return; 
     }
-  }
 
     // =========================================================================
     // 【運転日報のみ】ヘッダー作成ロジック
@@ -839,6 +838,8 @@ function renderTableData(response) {
         if (rowIndex === 2) {
           html += "<tr class='table-light fw-bold text-center' style='background-color: #f2f2f2 !important;'>";
           row.forEach((cell, colIndex) => {
+            if (colIndex > 11) return; // 🌟追加：L列（インデックス11）より右は表示しない
+
             if ([3, 4, 8, 9, 10, 11].includes(colIndex)) {
               html += `<th rowspan="2" class="align-middle" style="border: 1px solid #aaa !important; padding: 6px; font-size: 0.9rem; white-space: nowrap;">${cell ? cell.toString().trim() : ""}</th>`;
             } else if (colIndex === 5) {
@@ -853,6 +854,8 @@ function renderTableData(response) {
         } else if (rowIndex === 3) {
           html += "<tr class='table-light fw-bold text-center' style='background-color: #f2f2f2 !important;'>";
           row.forEach((cell, colIndex) => {
+            if (colIndex > 11) return; // 🌟追加：L列（インデックス11）より右は表示しない
+
             if ([3, 4, 8, 9, 10, 11].includes(colIndex)) return;
             html += `<th class="align-middle" style="border: 1px solid #aaa !important; padding: 4px; font-size: 0.85rem; white-space: nowrap;">${cell ? cell.toString().trim() : ""}</th>`;
           });
@@ -898,37 +901,43 @@ function renderTableData(response) {
     // =========================================================================
     // 通常行の処理（大伸運輸、一覧、および日報のデータ行）
     // =========================================================================
-    html += "<tr>";
+    if (isDriverLog && rowIndex === 27) {
+      html += "<tr class='page-break-before'>";
+    } else {
+      html += "<tr>";
+    }
+
     row.forEach((cell, colIndex) => {
+      // 🌟追加：通常データ行も、L列（インデックス11）より右は表示しない
+      if (isDriverLog && colIndex > 11) return; 
+      
       let cellStr = cell ? cell.toString().trim() : ""; 
       
       let rawCellStr = cellStr.toUpperCase();
       let isTrueData = (rawCellStr === 'TRUE' || rawCellStr === '✔' || rawCellStr === '1');
       const isEmpty = cellStr.replace(/[\s ]+/g, "") === "" || cellStr === "FALSE"; 
 
-      // 大伸運輸専用のスタイル・入力欄制御 (3行目〜7行目)
       if (isDaishin && rowIndex >= 2 && rowIndex <= 6) {
-        if (colIndex === 9) { // J列
+        if (colIndex === 9) { 
           html += `<td class="text-center" style="border: 1px solid #ccc !important; padding: 4px; background-color: #fff !important;">
                      <input type="checkbox" id="daishin_chk_${rowIndex}" ${isTrueData ? 'checked' : ''} onchange="recalcDaishinRow(${rowIndex})">
                    </td>`;
           return;
         }
-        if (colIndex === 11) { // L列
+        if (colIndex === 11) { 
           let numVal = parseFloat(cellStr.replace(/,/g, '')) || 0;
           html += `<td class="text-end" style="border: 1px solid #ccc !important; padding: 2px; background-color: #fff !important;">
                      <input type="number" id="daishin_price_${rowIndex}" value="${numVal}" style="width: 70px; text-align: right; border: 1px solid #ddd; padding: 2px;" onchange="recalcDaishinRow(${rowIndex})">
                    </td>`;
           return;
         }
-        if (colIndex === 13) { // N列
+        if (colIndex === 13) { 
           let displayVal = (cellStr === "0" || cellStr === "FALSE" || !cellStr) ? "0" : cellStr;
           html += `<th id="daishin_res_${rowIndex}" class="text-end fw-bold" style="border: 1px solid #ccc !important; padding: 4px; background-color: #f9f9f9 !important;">${displayVal}</th>`;
           return;
         }
       }
 
-      // N9セルの合計金額
       if (isDaishin && rowIndex === 8 && colIndex === 13) {
         html += `<th id="daishin_total_sum" class="text-end fw-bold text-danger" style="border: 1px solid #ccc !important; padding: 4px; background-color: #fff7f7 !important;">${cellStr}</th>`;
         return;
@@ -943,60 +952,46 @@ function renderTableData(response) {
       let bgStyle = "background-color: #fff !important;";
       let textColorStyle = ""; 
 
-      // =========================================================================
-      // 🌟 【運転日報専用】条件付き書式アラートロジック（①〜⑨）
-      // =========================================================================
       if (isDriverLog) {
         let curVal = parseFloat(cellStr.replace(/,/g, '')) || 0;
-
-        // ① B5〜B15 (インデックス 4〜14) の値が100を超えた場合
         if (colIndex === 1 && rowIndex >= 4 && rowIndex <= 14 && curVal > 100) {
           bgStyle = "background-color: #fff3cd !important;"; textColorStyle = "color: #dc3545 !important; font-weight: bold;";
         }
-        // ② C5〜C15 (インデックス 4〜14) の値が10を超えた場合
         else if (colIndex === 2 && rowIndex >= 4 && rowIndex <= 14 && curVal > 10) {
           bgStyle = "background-color: #fff3cd !important;"; textColorStyle = "color: #dc3545 !important; font-weight: bold;";
         }
-        // ③ D5〜D15 (インデックス 4〜14) の値が E5-4 〜 E5+4 の範囲外の場合
         else if (colIndex === 3 && rowIndex >= 4 && rowIndex <= 14) {
           let eVal = parseFloat(row[4] ? row[4].toString().replace(/,/g, '') : "0") || 0; 
           if (curVal < (eVal - 4) || curVal > (eVal + 4)) {
             bgStyle = "background-color: #fff3cd !important;"; textColorStyle = "color: #dc3545 !important; font-weight: bold;";
           }
         }
-        // ④ H5〜H15 (インデックス 4〜14) の値が G2*24 より多い場合
         else if (colIndex === 7 && rowIndex >= 4 && rowIndex <= 14 && g2HoursLimit > 0 && curVal > g2HoursLimit) {
           bgStyle = "background-color: #fff3cd !important;"; textColorStyle = "color: #dc3545 !important; font-weight: bold;";
         }
-        // ⑤ I5〜I15 (インデックス 4〜14) が 「有」 の場合
         else if (colIndex === 8 && rowIndex >= 4 && rowIndex <= 14 && cellStr === "有") {
           bgStyle = "background-color: #fff3cd !important;"; textColorStyle = "color: #dc3545 !important; font-weight: bold;";
         }
-        // ⑥ C32〜C43 (インデックス 31〜42) が 同じ行のB32〜B43 を超えている場合
         else if (colIndex === 2 && rowIndex >= 31 && rowIndex <= 42) {
           let bVal = parseFloat(row[1] ? row[1].toString().replace(/,/g, '') : "0") || 0; 
           if (curVal > bVal) {
             bgStyle = "background-color: #fff3cd !important;"; textColorStyle = "color: #dc3545 !important; font-weight: bold;";
           }
         }
-        // 🌟 ⑨【追加】K32〜K36 (インデックス 31〜35) の値が 同じ行の J32〜J36 の値から ±4 の範囲外の場合
         else if (colIndex === 10 && rowIndex >= 31 && rowIndex <= 35) {
-          let jVal = parseFloat(row[9] ? row[9].toString().replace(/,/g, '') : "0") || 0; // 同じ行のJ列の値
+          let jVal = parseFloat(row[9] ? row[9].toString().replace(/,/g, '') : "0") || 0; 
           if (curVal < (jVal - 4) || curVal > (jVal + 4)) {
             bgStyle = "background-color: #fff3cd !important;"; textColorStyle = "color: #dc3545 !important; font-weight: bold;";
           }
         }
-        // ⑦ 47, 48行目 (インデックス 46, 47) の B, C列 (インデックス 1, 2) が 2 を超える場合
         else if ((rowIndex === 46 || rowIndex === 47) && (colIndex === 1 || colIndex === 2) && curVal > 2) {
           bgStyle = "background-color: #fff3cd !important;"; textColorStyle = "color: #dc3545 !important; font-weight: bold;";
         }
-        // ⑧ 47, 48行目 (インデックス 46, 47) の D, E列 (インデックス 3, 4) が 1 を超える場合
         else if ((rowIndex === 46 || rowIndex === 47) && (colIndex === 3 || colIndex === 4) && curVal > 1) {
           bgStyle = "background-color: #fff3cd !important;"; textColorStyle = "color: #dc3545 !important; font-weight: bold;";
         }
       }
 
-      // 枠線の判定ロジック
       if (isListView) {
         if (rowIndex <= 2) {
           borderStyle = "border: none !important;"; bgStyle = "background-color: transparent !important;";
@@ -1145,7 +1140,7 @@ function setPrintPageStyle(orientation) {
     document.head.appendChild(styleEl);
   }
   if (orientation === 'landscape') {
-    styleEl.innerHTML = '@page { size: A4 landscape; margin: 10mm; }';
+    styleEl.innerHTML = '@page { size: A4 landscape; margin: 5mm; }';
   } else {
     styleEl.innerHTML = '@page { size: A4 portrait; margin: 12mm; }';
   }
