@@ -348,6 +348,9 @@ function logout() {
   currentSiteName = ""; currentBuilding = ""; currentArea = "";
   document.getElementById('loginPass').value = "";
   document.getElementById('commonStaff').value = "";
+  document.getElementById('commonDate').value = "";
+  document.getElementById('commonWeather').selectedIndex = 0;
+
   hideAllViews();
   document.getElementById('loginView').style.display = 'block';
 }
@@ -493,7 +496,11 @@ function updateAreaButtonsBadge() {
     badge.className = 'badge bg-secondary ms-3 area-badge'; badge.innerText = '確認中...';
   });
   getScriptRun(savedData => {
-    if (savedData && savedData.length > 0 && savedData[0].weather) { document.getElementById('commonWeather').value = savedData[0].weather; }
+    // 🌟 以下の if文ブロックを書き換えます
+    if (savedData && savedData.length > 0) { 
+      if (savedData[0].weather) document.getElementById('commonWeather').value = savedData[0].weather; 
+      if (savedData[0].staff) document.getElementById('commonStaff').value = savedData[0].staff;
+    }
     const areas = [...new Set(masterData.filter(row => row[0] === currentSiteName && row[1] === currentBuilding).map(row => row[2]))];
     areas.forEach(area => {
       const areaMaster = masterData.filter(row => row[0] === currentSiteName && row[1] === currentBuilding && row[2] === area);
@@ -616,12 +623,29 @@ function fetchSavedData() {
   const mainBadge = document.getElementById('unfilledBadge');
   mainBadge.style.display = 'inline-block'; mainBadge.className = 'badge bg-secondary fs-6 ms-2'; mainBadge.innerHTML = 'データ確認中...';
 
-  getScriptRun(data => {
+   getScriptRun(data => {
+   
     if (data && data.length > 0) {
-      if (data[0].weather) { document.getElementById('commonWeather').value = data[0].weather; }
+      if (data[0].weather) document.getElementById('commonWeather').value = data[0].weather; 
+      if (data[0].staff) document.getElementById('commonStaff').value = data[0].staff;
+       
       data.forEach(d => {
+        const d_no = d.no ? d.no.trim() : "";
+        const d_item = d.item ? d.item.trim() : "";        
         const els = document.querySelectorAll(`.data-input[data-name="${d.no}"][data-item="${d.item}"], .data-input-memo[data-name="${d.no}"][data-item="${d.item}"]`);
-        els.forEach(el => { if (el.type === 'radio') { if (el.value === d.value) el.checked = true; } else { el.value = d.value; } });
+        els.forEach(el =>
+         { if (el.type === 'radio') {
+            let compareVal = d.value;
+            if (compareVal === "1") compareVal = "100%";
+            else if (compareVal === "0.75") compareVal = "75%";
+            else if (compareVal === "0.5") compareVal = "50%";
+            else if (compareVal === "0.25") compareVal = "25%";
+            else if (compareVal === "0") compareVal = "0%";
+
+           if (el.value === compareVal) el.checked = true;
+            }else {
+             el.value = d.value; }
+          });
       });
     }
     updateUnfilledCount();

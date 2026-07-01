@@ -62,7 +62,7 @@ function getSiteList() {
 // 既存データを取得する処理（エリア別・フォーム反映用）
 function getDailyData(dateStr, siteName, building, area, targetSsId) {
   try {
-    const ss = SpreadsheetApp.openById(targetSsId); // 🌟各工場のスプシを開く
+    const ss = SpreadsheetApp.openById(targetSsId);
     const sheet = ss.getSheetByName('データ保存');
     if (!sheet) return [];
     
@@ -79,19 +79,25 @@ function getDailyData(dateStr, siteName, building, area, targetSsId) {
          dStr = String(row[0]).replace(/\//g, '-');
       }
       
-      if (dStr === dateStr && row[1] === siteName && row[4] === building && row[5] === area) {
-        const eqName = String(row[6]).replace(/^'/, '');
+      // 🌟前後の見えない空白などが原因でデータが一致しないのを防ぐため、全てtrim()で空白除去
+      if (dStr === dateStr && 
+          String(row[1]).trim() === String(siteName).trim() && 
+          String(row[4]).trim() === String(building).trim() && 
+          String(row[5]).trim() === String(area).trim()) {
+          
+        const eqName = String(row[6]).replace(/^'/, '').trim(); 
         result.push({
           no: eqName,
-          item: String(row[7]),
-          value: String(row[8]),
-          weather: String(row[3])
+          item: String(row[7]).trim(), 
+          value: String(row[8]).trim(), 
+          weather: String(row[3]).trim(),
+          staff: String(row[2]).trim() 
         });
       }
     }
     return result;
   } catch(e) {
-    console.error(e);
+    console.error("getDailyDataエラー:", e);
     return [];
   }
 }
@@ -125,7 +131,8 @@ function getBuildingData(dateStr, siteName, building, targetSsId) {
           no: eqName,
           item: String(row[7]),
           value: String(row[8]),
-          weather: String(row[3])
+          weather: String(row[3]),
+          staff:String(row[2])
         });
       }
     }
