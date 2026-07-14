@@ -632,7 +632,8 @@ function fetchSavedData() {
       data.forEach(d => {
         const d_no = d.no ? d.no.trim() : "";
         const d_item = d.item ? d.item.trim() : "";        
-        const els = document.querySelectorAll(`.data-input[data-name="${d.no}"][data-item="${d.item}"], .data-input-memo[data-name="${d.no}"][data-item="${d.item}"]`);
+        const els = document.querySelectorAll(`.data-input[data-name="${d_no}"][data-item="${d_item}"], .data-input-memo[data-name="${d_no}"][data-item="${d_item}"]`);
+  
         els.forEach(el =>
          { if (el.type === 'radio') {
             let compareVal = d.value;
